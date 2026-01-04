@@ -1,0 +1,69 @@
+# ============================================================
+# TicketRush Worker Dockerfile
+# ============================================================
+# Separate Docker image for the background worker
+# 
+# Build: docker build -f Dockerfile.worker -t ticketrush-worker:latest .
+# Run:   docker run ticketrush-worker:latest
+# ============================================================
+
+# ============================================================
+# STAGE 1: Dependencies
+# ============================================================
+FROM node:22-alpine AS deps
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma/
+
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --legacy-peer-deps
+
+RUN npx prisma generate
+
+# ============================================================
+# STAGE 2: Builder
+# ============================================================
+FROM node:22-alpine AS builder
+
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+ENV NODE_ENV=production
+
+# Compile TypeScript worker
+RUN npx tsc --project tsconfig.json --outDir dist --skipLibCheck || true
+
+# ============================================================
+# STAGE 3: Runner (Production)
+# ============================================================
+FROM node:22-alpine AS runner
+
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+# Create non-root user
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 worker
+
+# Copy dependencies
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=builder /app/src ./src
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/tsconfig.json ./
+
+# Switch to non-root user
+USER worker
+
+# Health check (worker has no HTTP endpoint, so we check process)
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD pgrep -f "worker" || exit 1
+
+# Start the worker
+CMD ["npx", "tsx", "src/worker.ts"]
