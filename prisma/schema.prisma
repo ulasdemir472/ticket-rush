@@ -1,0 +1,81 @@
+// TicketRush Prisma Schema
+// Domain Models: User, Event, Seat
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ===========================================
+// Enums
+// ===========================================
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum SeatStatus {
+  AVAILABLE
+  LOCKED
+  SOLD
+}
+
+// ===========================================
+// Models
+// ===========================================
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(CUSTOMER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("users")
+}
+
+model Event {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  date        DateTime
+  location    String
+  totalSeats  Int      @map("total_seats")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  seats Seat[]
+
+  // Indexes for query performance
+  @@index([date])
+  @@index([createdAt])
+  @@map("events")
+}
+
+model Seat {
+  id         String     @id @default(uuid())
+  eventId    String     @map("event_id")
+  seatNumber String     @map("seat_number")
+  status     SeatStatus @default(AVAILABLE)
+  price      Decimal    @db.Decimal(10, 2)
+  userId     String?    @map("user_id")       // User who locked/bought the seat
+  version    Int        @default(1)           // Optimistic locking version
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+
+  // Relations
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  // Indexes for query performance
+  @@unique([eventId, seatNumber])
+  @@index([eventId])
+  @@index([status])
+  @@index([userId])
+  @@map("seats")
+}
