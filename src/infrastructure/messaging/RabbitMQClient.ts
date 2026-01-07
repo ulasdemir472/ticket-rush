@@ -83,10 +83,9 @@ export class RabbitMQClient {
   }
 
   /**
-   * Publishes a message to a queue
    * Auto-connects if not connected (Lazy Connection)
    */
-  async publish(queue: string, message: object): Promise<boolean> {
+  async publish(queue: string, message: object, options?: amqp.Options.Publish): Promise<boolean> {
     // 1. Lazy Connect
     if (!this.channel) {
       console.log("🔌 Auto-connecting to RabbitMQ for publish...");
@@ -112,6 +111,7 @@ export class RabbitMQClient {
       persistent: true,
       contentType: 'application/json',
       timestamp: Date.now(),
+      ...options,
     });
 
     console.log("✅ Message sent to buffer");

@@ -57,3 +57,23 @@ export async function getBookingService(): Promise<BookingService> {
   }
   return _bookingService;
 }
+
+let _seatRepository: ISeatRepository | null = null;
+
+export async function getSeatRepository(): Promise<ISeatRepository> {
+  if (!_seatRepository) {
+      const { prisma } = await import('@/infrastructure/db/prisma');
+      const { PrismaSeatRepository } = await import('@/infrastructure/repositories/PrismaSeatRepository');
+      const { CachedSeatRepository } = await import('@/infrastructure/repositories/CachedSeatRepository');
+      const { RedisService } = await import('@/infrastructure/cache/RedisService');
+
+      const prismaRepository = new PrismaSeatRepository(prisma);
+      const redisCache = new RedisService(60); 
+      _seatRepository = new CachedSeatRepository(
+        prismaRepository,
+        redisCache,
+        60
+      );
+  }
+  return _seatRepository;
+}
