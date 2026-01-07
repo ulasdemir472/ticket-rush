@@ -19,10 +19,11 @@ const globalForPrisma = globalThis as unknown as {
 
 function createPrismaClient(): PrismaClient {
   // Create PostgreSQL connection pool
-  const connectionString = process.env.DATABASE_URL;
+  // Fallback to a dummy connection string during build time (Docker)
+  const connectionString = process.env.DATABASE_URL || 'postgresql://build:build@localhost:5432/build';
   
-  if (!connectionString) {
-    throw new Error('DATABASE_URL environment variable is not set');
+  if (!process.env.DATABASE_URL) {
+      console.warn('⚠️ DATABASE_URL is not set. Using dummy connection for build/initialization.');
   }
 
   const pool = globalForPrisma.pool ?? new Pool({ connectionString });
