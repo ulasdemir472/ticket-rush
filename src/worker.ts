@@ -16,6 +16,9 @@
  * @file worker.ts
  */
 
+// Load environment variables from .env file
+import 'dotenv/config';
+
 import amqp from 'amqplib';
 import winston from 'winston';
 import { v4 as uuidv4 } from 'uuid';
@@ -55,12 +58,12 @@ const logger = winston.createLogger({
 // ===========================================
 
 async function generatePDF(seatId: string, seatNumber: string): Promise<void> {
-  logger.info(`📄 Generating PDF for Seat ${seatNumber}`, { seatId });
+  logger.info(`📄 Generating PDF for Seat ${seatId}`, { seatNumber });
   
   // Simulate heavy processing (2 seconds)
   await new Promise((resolve) => setTimeout(resolve, 2000));
   
-  logger.info(`✅ PDF generated for Seat ${seatNumber}`);
+  logger.info(`✅ PDF generated for Seat ${seatId}`);
 }
 
 async function sendEmailNotification(userId: string, seatNumber: string): Promise<void> {
@@ -142,7 +145,12 @@ async function startWorker(): Promise<void> {
           const messageHeaders = msg.properties.headers || {};
           const correlationIdFromHeader = messageHeaders['x-correlation-id'] as string | undefined;
           const messageContent = JSON.parse(msg.content.toString());
+
+          // DEBUG: Log the exact payload to debug "undefined" issues
+          console.log("📦 Received Payload:", messageContent);
+          logger.info("📦 Received Payload (Winston):", { payload: messageContent });
           
+          await processSeatSoldEvent(messageContent);
           // Priority: header > message body > generate new
           currentCorrelationId = 
             correlationIdFromHeader ?? 
@@ -154,8 +162,8 @@ async function startWorker(): Promise<void> {
               messageContent.correlationId ? 'body' : 'generated',
           });
 
-          // Process the message
-          await processSeatSoldEvent(messageContent);
+          // Process the message - ALREADY PROCESSED ABOVE
+          // await processSeatSoldEvent(messageContent);
 
           // ================================================================
           // ✅ ACK ONLY AFTER SUCCESSFUL PROCESSING

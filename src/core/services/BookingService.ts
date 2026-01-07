@@ -91,7 +91,7 @@ export class BookingService {
     // 4. Persist the change (handled by CachedSeatRepository - DB + cache invalidation)
     await this.seatRepository.save(lockedSeat);
 
-    // 5. Publish event (fire-and-forget - does NOT block response)
+    // 5. Publish event (now awaited for reliability + lazy connect)
     if (this.eventPublisher) {
       const event = createSeatLockedEvent({
         seatId: lockedSeat.id,
@@ -101,9 +101,13 @@ export class BookingService {
         price: lockedSeat.price,
       });
       
-      // Fire-and-forget: don't await, just schedule
-      this.eventPublisher.publish(EVENT_QUEUES.NOTIFICATION, event)
-        .catch(err => console.error('[BookingService] Failed to publish SeatLockedEvent:', err));
+      console.log("📝 DB Transaction committed. Starting Publish (SeatLocked)...");
+      try {
+        await this.eventPublisher.publish(EVENT_QUEUES.NOTIFICATION, event);
+        console.log("🎉 Publish process finished (SeatLocked).");
+      } catch (err) {
+        console.error('[BookingService] Failed to publish SeatLockedEvent:', err);
+      }
     }
 
     return lockedSeat;
@@ -193,9 +197,13 @@ export class BookingService {
         price: soldSeat.price,
       });
       
-      // Non-blocking: schedule publish but don't await
-      this.eventPublisher.publish(EVENT_QUEUES.TICKET_GENERATION, event)
-        .catch(err => console.error('[BookingService] Failed to publish SeatSoldEvent:', err));
+      console.log("📝 DB Transaction committed. Starting Publish (SeatSold)...");
+      try {
+        await this.eventPublisher.publish(EVENT_QUEUES.TICKET_GENERATION, event);
+        console.log("🎉 Publish process finished (SeatSold).");
+      } catch (err) {
+        console.error('[BookingService] Failed to publish SeatSoldEvent:', err);
+      }
     }
 
     return soldSeat;

@@ -35,6 +35,8 @@ export async function getBookingService(): Promise<BookingService> {
     const { PrismaSeatRepository } = await import('@/infrastructure/repositories/PrismaSeatRepository');
     const { CachedSeatRepository } = await import('@/infrastructure/repositories/CachedSeatRepository');
     const { RedisService } = await import('@/infrastructure/cache/RedisService');
+    const { RabbitMQClient } = await import('@/infrastructure/messaging/RabbitMQClient');
+    const { RabbitMQEventPublisher } = await import('@/infrastructure/messaging/RabbitMQEventPublisher');
     
     // Create the repository chain:
     // Prisma (database) → Cached (Redis decorator)
@@ -45,9 +47,13 @@ export async function getBookingService(): Promise<BookingService> {
       redisCache,
       60 // TTL in seconds
     );
+
+    // Create Messaging infrastructure
+    const rabbitMQClient = RabbitMQClient.getInstance();
+    const eventPublisher = new RabbitMQEventPublisher(rabbitMQClient);
     
-    // Inject the cached repository into the service
-    _bookingService = new BookingService(cachedRepository);
+    // Inject the cached repository AND event publisher into the service
+    _bookingService = new BookingService(cachedRepository, eventPublisher);
   }
   return _bookingService;
 }
